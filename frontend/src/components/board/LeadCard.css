@@ -1,0 +1,203 @@
+.lead-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  cursor: grab;
+  transition: all var(--transition-fast);
+  animation: fadeInUp 0.2s ease-out;
+  user-select: none;
+  position: relative;
+}
+
+/* ── Semáforo de urgencia ──────────── */
+.lead-card__urgency {
+  position: absolute;
+  top: 12px;
+  left: -1px;
+  width: 4px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  transition: all 0.3s ease;
+}
+
+.lead-card__urgency--fresh {
+  background: #10B981;
+}
+
+.lead-card__urgency--warm {
+  background: #F59E0B;
+}
+
+.lead-card__urgency--stale {
+  background: #EF4444;
+  animation: urgencyPulse 2s ease-in-out infinite;
+}
+
+.lead-card--stale {
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+@keyframes urgencyPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px #EF444460; }
+  50% { opacity: 0.5; box-shadow: none; }
+}
+
+/* ── Botones de acción rápida ─────── */
+.lead-card__quick-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 2;
+}
+
+.lead-card:hover .lead-card__quick-actions {
+  opacity: 1;
+}
+
+.lead-card__quick-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lead-card__quick-btn--wa:hover {
+  background: #25D36620;
+  border-color: #25D366;
+  color: #25D366;
+}
+
+.lead-card__quick-btn--archive:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.lead-card:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.lead-card--dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+}
+
+.lead-card--overlay {
+  cursor: grabbing;
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-primary);
+  transform: rotate(2deg) scale(1.02);
+}
+
+/* ── Name ─────────────────────────── */
+.lead-card__name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-sm);
+  line-height: 1.3;
+  padding-left: 6px;
+}
+
+/* ── Contact Details ──────────────── */
+.lead-card__details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: var(--space-sm);
+}
+
+.lead-card__detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.lead-card__detail svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.lead-card__detail span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Tags Row ─────────────────────── */
+.lead-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: var(--space-sm);
+}
+
+.lead-card__source {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.lead-card__tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.lead-card__tag--more {
+  background: var(--bg-card) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-color) !important;
+  font-weight: 500;
+}
+
+/* ── Footer ───────────────────────── */
+.lead-card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-light);
+}
+
+.lead-card__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lead-card__followup,
+.lead-card__owner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.lead-card__followup svg {
+  color: var(--stage-contacted);
+}

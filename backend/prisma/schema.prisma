@@ -1,0 +1,441 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USUARIOS ───────────────────────────────────────────
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  avatarUrl String?
+  role      UserRole @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments Assignment[]
+  leadNotes   LeadNote[]
+  followUps   FollowUp[]
+  activities  LeadActivity[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+// ─── EMPRESAS (WORKSPACES / PESTAÑAS) ───────────────────
+model Company {
+  id          String  @id @default(uuid())
+  name        String
+  slug        String  @unique
+  description String?
+  color       String  @default("#2596DC")
+  logoUrl     String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sheetConnection  CompanySheetConnection?
+  stages           LeadStage[]
+  leads            Lead[]
+  automationEvents AutomationEvent[]
+  webhookConfig    WebhookConfig?
+  notifications    Notification[]
+  syncExcludeList  SyncExcludeList[]
+  sequences        Sequence[]
+
+  @@map("companies")
+}
+
+// ─── CONEXIÓN GOOGLE SHEET (1:1 por empresa) ────────────
+model CompanySheetConnection {
+  id              String     @id @default(uuid())
+  companyId       String     @unique
+  spreadsheetId   String
+  sheetName       String     @default("Sheet1")
+  sheetTabs       Json       @default("[]")   // [{ name, sourceLabel, enabled }]
+  headerRow       Int        @default(1)
+  columnMapping   Json       // { "fullName": "A", "email": "B", "phone": "C", ... }
+  lastSyncAt      DateTime?
+  syncStatus      SyncStatus @default(IDLE)
+  syncErrorMsg    String?
+  autoSyncEnabled Boolean    @default(false)
+  autoSyncIntervalMinutes Int @default(30)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  syncMaps LeadSyncMap[]
+
+  @@map("company_sheet_connections")
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  ERROR
+}
+
+// ─── ROL FUNCIONAL DE ETAPA ─────────────────────────────
+enum StageRole {
+  ENTRY       // Etapa de entrada — leads nuevos caen aquí (aparecen en "Sin contactar")
+  CONTACTED   // Ya fue contactado — desaparece del dashboard
+  FOLLOW_UP   // En seguimiento — etapa intermedia
+  WON         // Ganado / Cerrado positivo
+  LOST        // Perdido
+  DEFAULT     // Sin comportamiento especial
+}
+
+// ─── ETAPAS DE LEAD (Columnas del Kanban) ───────────────
+model LeadStage {
+  id        String    @id @default(uuid())
+  companyId String
+  name      String
+  slug      String
+  color     String    @default("#6B7280")
+  position  Int
+  role      StageRole @default(DEFAULT)
+  isFinal   Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads   Lead[]
+
+  @@unique([companyId, slug])
+  @@map("lead_stages")
+}
+
+// ─── LEADS ──────────────────────────────────────────────
+model Lead {
+  id             String    @id @default(uuid())
+  companyId      String
+  stageId        String
+  fullName       String
+  email          String?
+  phone          String?
+  source         String?
+  tags           String[]  @default([])
+  customFields   Json?
+  nextFollowUpAt DateTime?
+  isArchived     Boolean   @default(false)
+  position       Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stage       LeadStage    @relation(fields: [stageId], references: [id])
+  syncMap     LeadSyncMap?
+  assignments Assignment[]
+  notes       LeadNote[]
+  followUps   FollowUp[]
+  activities  LeadActivity[]
+  enrollments SequenceEnrollment[]
+
+  @@index([companyId, stageId])
+  @@index([companyId, source])
+  @@index([companyId, nextFollowUpAt])
+  @@map("leads")
+}
+
+// ─── MAPA LEAD ↔ FILA DE GOOGLE SHEET ───────────────────
+model LeadSyncMap {
+  id                String   @id @default(uuid())
+  leadId            String   @unique
+  sheetConnectionId String
+  sheetRowIndex     Int
+  sheetRowHash      String
+  lastSyncedAt      DateTime @default(now())
+
+  lead            Lead                   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sheetConnection CompanySheetConnection @relation(fields: [sheetConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetConnectionId, sheetRowIndex])
+  @@map("lead_sync_maps")
+}
+
+// ─── ASIGNACIONES ───────────────────────────────────────
+model Assignment {
+  id         String   @id @default(uuid())
+  leadId     String
+  userId     String
+  assignedAt DateTime @default(now())
+  isActive   Boolean  @default(true)
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([leadId, userId])
+  @@map("assignments")
+}
+
+// ─── NOTAS DE LEAD ──────────────────────────────────────
+model LeadNote {
+  id        String   @id @default(uuid())
+  leadId    String
+  authorId  String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead   Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id])
+
+  @@map("lead_notes")
+}
+
+// ─── SEGUIMIENTOS (FOLLOW-UPS) ──────────────────────────
+model FollowUp {
+  id           String         @id @default(uuid())
+  leadId       String
+  assignedToId String
+  dueAt        DateTime
+  note         String?
+  status       FollowUpStatus @default(PENDING)
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  lead       Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedTo User @relation(fields: [assignedToId], references: [id])
+
+  @@index([dueAt, status])
+  @@map("follow_ups")
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  OVERDUE
+}
+
+// ─── LOG DE ACTIVIDAD DEL LEAD ──────────────────────────
+model LeadActivity {
+  id        String       @id @default(uuid())
+  leadId    String
+  userId    String?
+  type      ActivityType
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([leadId, createdAt])
+  @@map("lead_activities")
+}
+
+enum ActivityType {
+  CREATED
+  STAGE_CHANGED
+  NOTE_ADDED
+  FOLLOWUP_CREATED
+  FOLLOWUP_COMPLETED
+  ASSIGNED
+  REASSIGNED
+  SYNCED_FROM_SHEET
+  FIELD_UPDATED
+  SEQUENCE_ENROLLED
+  SEQUENCE_EMAIL_SENT
+  SEQUENCE_COMPLETED
+  SEQUENCE_PAUSED
+  SEQUENCE_CANCELLED
+}
+
+// ─── CONFIGURACIÓN DE WEBHOOK POR EMPRESA ───────────────
+model WebhookConfig {
+  id         String  @id @default(uuid())
+  companyId  String  @unique
+  webhookUrl String
+  secretKey  String?
+  isActive   Boolean @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("webhook_configs")
+}
+
+// ─── EVENTOS DE AUTOMATIZACIÓN (Outbox para n8n) ────────
+model AutomationEvent {
+  id        String              @id @default(uuid())
+  companyId String
+  eventType AutomationEventType
+  payload   Json
+  createdAt DateTime            @default(now())
+
+  company    Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deliveries AutomationDelivery[]
+
+  @@index([companyId, eventType])
+  @@map("automation_events")
+}
+
+enum AutomationEventType {
+  NEW_LEAD
+  LEAD_UPDATED
+  STATUS_CHANGED
+  FOLLOWUP_CREATED
+  FOLLOWUP_DUE
+  LEAD_REASSIGNED
+}
+
+// ─── DELIVERIES DE WEBHOOK (log de envíos) ──────────────
+model AutomationDelivery {
+  id            String   @id @default(uuid())
+  eventId       String
+  webhookUrl    String
+  statusCode    Int?
+  responseBody  String?
+  success       Boolean  @default(false)
+  attemptCount  Int      @default(1)
+  lastAttemptAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  event AutomationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("automation_deliveries")
+}
+// ─── NOTIFICACIONES ─────────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  companyId String
+  type      String   @default("NEW_LEADS")
+  title     String
+  body      String
+  count     Int      @default(1)
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([isRead, createdAt])
+  @@map("notifications")
+}
+// ─── LISTA DE EXCLUSIÓN DEL SYNC ────────────────────────
+// Guarda email/teléfono de leads eliminados permanentemente
+// para que el sync nunca los vuelva a importar.
+model SyncExcludeList {
+  id        String   @id @default(uuid())
+  companyId String
+  email     String?
+  phone     String?
+  fullName  String?
+  reason    String   @default("PERMANENTLY_DELETED")
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, email])
+  @@index([companyId, phone])
+  @@map("sync_exclude_list")
+}
+
+// ─── SECUENCIAS DE SEGUIMIENTO ───────────────────────
+model Sequence {
+  id           String   @id @default(uuid())
+  companyId    String
+  name         String
+  description  String?
+  isActive     Boolean  @default(true)
+  isAutoAssign Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company     Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  steps       SequenceStep[]
+  enrollments SequenceEnrollment[]
+
+  @@index([companyId])
+  @@map("sequences")
+}
+
+// ─── PASOS DE UNA SECUENCIA ──────────────────────────
+model SequenceStep {
+  id           String          @id @default(uuid())
+  sequenceId   String
+  position     Int
+  channel      SequenceChannel @default(EMAIL)
+  delayMinutes Int             @default(0)
+  sendAtTime   String?         // Hora HH:MM en zona Colombia, ej: "15:00"
+  subject      String
+  bodyHtml     String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  sequence   Sequence        @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  executions StepExecution[]
+
+  @@index([sequenceId, position])
+  @@map("sequence_steps")
+}
+
+enum SequenceChannel {
+  EMAIL
+}
+
+// ─── INSCRIPCIÓN DE UN LEAD EN UNA SECUENCIA ────────
+model SequenceEnrollment {
+  id             String           @id @default(uuid())
+  leadId         String
+  sequenceId     String
+  status         EnrollmentStatus @default(ACTIVE)
+  currentStepPos Int              @default(0)
+  enrolledAt     DateTime         @default(now())
+  pausedAt       DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
+
+  lead       Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sequence   Sequence        @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  executions StepExecution[]
+
+  @@unique([leadId, sequenceId])
+  @@index([status])
+  @@map("sequence_enrollments")
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+// ─── EJECUCIÓN DE CADA PASO ──────────────────────────
+model StepExecution {
+  id             String          @id @default(uuid())
+  enrollmentId   String
+  stepId         String
+  status         ExecutionStatus @default(SCHEDULED)
+  scheduledAt    DateTime
+  executedAt     DateTime?
+  errorMessage   String?
+  emailMessageId String?
+  createdAt      DateTime        @default(now())
+
+  enrollment SequenceEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  step       SequenceStep       @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([enrollmentId])
+  @@map("step_executions")
+}
+
+enum ExecutionStatus {
+  SCHEDULED
+  EXECUTING
+  SENT
+  FAILED
+  SKIPPED
+}

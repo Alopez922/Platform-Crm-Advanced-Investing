@@ -1,0 +1,14 @@
+.kanban-board {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+}
+
+/* Asegurar que el board ocupe todo el ancho necesario */
+.kanban-board::-webkit-scrollbar {
+  height: 8px;
+}
