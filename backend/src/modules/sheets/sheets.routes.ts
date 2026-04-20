@@ -9,8 +9,8 @@ const router = Router({ mergeParams: true });
 
 const connectSheetSchema = z.object({
   spreadsheetId: z.string().min(1, 'El ID de la hoja es obligatorio'),
-  sheetName: z.string().optional().default('Sheet1'),
-  columnMapping: z.record(z.string()).optional().default({}),
+  sheetName: z.string().default('Sheet1'),
+  columnMapping: z.record(z.string(), z.string()).default({}),
 });
 
 // GET /api/companies/:companyId/sheets — Estado de conexión

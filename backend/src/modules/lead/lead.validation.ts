@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 export const createLeadSchema = z.object({
   fullName: z.string().min(1, 'El nombre completo es obligatorio'),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   source: z.string().optional(),
   stageId: z.string().uuid('ID de etapa inválido').optional(),
   tags: z.array(z.string()).optional(),
-  customFields: z.record(z.any()).optional(),
+  customFields: z.record(z.string(), z.unknown()).optional(),
   nextFollowUpAt: z.string().datetime().optional(),
 });
 
