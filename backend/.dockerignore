@@ -9,4 +9,3 @@ dist
 README.md
 *.md
 credentials.json
-prisma/schema.prisma
