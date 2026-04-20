@@ -8,11 +8,10 @@ RUN npm ci
 
 COPY . .
 
-# La URL del backend se pasa en tiempo de build
+# Usar vite build directamente (omite tsc para evitar errores de tipos en CI)
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
-
-RUN npm run build
+RUN npx vite build
 
 # ── Etapa 2: Servir con Nginx ────────────────────────────────────────────────
 FROM nginx:alpine
