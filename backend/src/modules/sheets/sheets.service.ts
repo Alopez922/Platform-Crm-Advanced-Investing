@@ -1,12 +1,24 @@
 import { google } from 'googleapis';
-import path from 'path';
 import { prisma } from '../../lib/prisma';
+import { env } from '../../config/env';
 import { sequenceService } from '../sequence/sequence.service';
-
-const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
 
 // ── Autenticación con cuenta de servicio ──────────────────
 function getAuthClient() {
+  // En producción: usar variables de entorno (Secret Manager)
+  // En desarrollo: si existen las vars, usarlas; si no, fallback al archivo local
+  if (env.GOOGLE_SERVICE_ACCOUNT_EMAIL && env.GOOGLE_PRIVATE_KEY) {
+    return new google.auth.GoogleAuth({
+      credentials: {
+        client_email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    });
+  }
+  // Fallback para desarrollo local con credentials.json
+  const path = require('path');
+  const CREDENTIALS_PATH = path.join(process.cwd(), 'credentials.json');
   return new google.auth.GoogleAuth({
     keyFile: CREDENTIALS_PATH,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
