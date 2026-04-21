@@ -8,9 +8,8 @@ RUN npm ci
 
 COPY . .
 
-# Usar vite build directamente (omite tsc para evitar errores de tipos en CI)
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+# URL del backend en producción — hardcodeada para garantizar que Vite la incluya en el bundle
+ENV VITE_API_URL=https://crm-backend-326048189386.us-central1.run.app/api
 RUN npx vite build
 
 # ── Etapa 2: Servir con Nginx ────────────────────────────────────────────────
